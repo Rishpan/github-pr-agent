@@ -1,1 +1,4 @@
 .cursor
+node_modules
+.env
+mcp-server/node_modules

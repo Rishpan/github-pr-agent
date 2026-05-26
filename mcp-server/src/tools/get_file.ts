@@ -12,7 +12,9 @@ export const GetFileSchema = z.object({
 
 export type GetFileInput = z.infer<typeof GetFileSchema>;
 
-const octokit = new Octokit();
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN || undefined,
+});
 
 export async function getFile(input: GetFileInput): Promise<string> {
   const [owner, repo] = input.repo.split("/");

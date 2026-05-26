@@ -7,17 +7,15 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-server.tool(
-  "get_file",
-  "Fetch raw file content from a public GitHub repository",
-  GetFileSchema.shape,
-  async (params) => {
-    const content = await getFile(params);
-    return {
-      content: [{ type: "text", text: content }],
-    };
-  }
-);
+server.registerTool("get_file", {
+  description: "Fetch raw file content from a public GitHub repository",
+  inputSchema: GetFileSchema.shape,
+}, async ({ repo, path }) => {
+  const content = await getFile({ repo, path });
+  return {
+    content: [{ type: "text", text: content }],
+  };
+});
 
 async function main() {
   const transport = new StdioServerTransport();
