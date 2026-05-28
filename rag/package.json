@@ -1,0 +1,26 @@
+{
+  "name": "mcp-pr-agent-rag",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "chroma": "docker run -d --name chroma -p 8000:8000 chromadb/chroma",
+    "chroma:stop": "docker stop chroma && docker rm chroma",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chroma-core/default-embed": "^0.1.9",
+    "@repomix/tree-sitter-wasms": "^0.1.17",
+    "chromadb": "^3.4.3",
+    "dotenv": "^17.4.2",
+    "pino": "^10.3.1",
+    "simple-git": "^3.36.0",
+    "web-tree-sitter": "^0.26.9"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "tsx": "^4.22.3",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.7"
+  }
+}
