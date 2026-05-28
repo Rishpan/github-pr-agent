@@ -1,4 +1,4 @@
-# mcp-pr-agent
+# github-pr-agent
 
 An agentic AI system that reads a GitHub issue, retrieves relevant 
 code via RAG, and opens a draft pull request — built on a custom MCP server.

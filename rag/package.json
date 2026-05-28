@@ -1,5 +1,5 @@
 {
-  "name": "mcp-pr-agent-rag",
+  "name": "github-pr-agent-rag",
   "version": "0.1.0",
   "private": true,
   "scripts": {

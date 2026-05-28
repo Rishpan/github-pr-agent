@@ -19,7 +19,7 @@ export async function cloneRepo(repo: string): Promise<string> {
   }
 
   const log = logger.child({ tool: "cloner", repo });
-  const dest = path.join("/tmp", "mcp-pr-agent", owner, repoName);
+  const dest = path.join("/tmp", "github-pr-agent", owner, repoName);
 
   try {
     if (fs.existsSync(path.join(dest, ".git"))) {

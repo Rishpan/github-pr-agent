@@ -5,7 +5,7 @@ import { ListFilesSchema, listFiles } from "./tools/list_files.js";
 import { logger } from "./logger.js";
 
 const server = new McpServer({
-  name: "mcp-pr-agent",
+  name: "github-pr-agent",
   version: "0.1.0",
 });
 

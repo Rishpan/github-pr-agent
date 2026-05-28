@@ -1,5 +1,5 @@
 {
-  "name": "mcp-pr-agent-server",
+  "name": "github-pr-agent-server",
   "version": "0.1.0",
   "private": true,
   "scripts": {

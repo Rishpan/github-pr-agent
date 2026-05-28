@@ -390,10 +390,10 @@ export async function chunkFile(
   return chunks;
 }
 
-/** Derive owner/repo from cloner layout: /tmp/mcp-pr-agent/{owner}/{repo}/... */
+/** Derive owner/repo from cloner layout: /tmp/github-pr-agent/{owner}/{repo}/... */
 function repoLabelFromLocalPath(localPath: string): string {
   const normalized = path.normalize(localPath);
-  const marker = `${path.sep}tmp${path.sep}mcp-pr-agent${path.sep}`;
+  const marker = `${path.sep}tmp${path.sep}github-pr-agent${path.sep}`;
   const idx = normalized.toLowerCase().indexOf(marker.toLowerCase());
   if (idx !== -1) {
     const rest = normalized.slice(idx + marker.length);
