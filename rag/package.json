@@ -2,6 +2,18 @@
   "name": "github-pr-agent-rag",
   "version": "0.1.0",
   "private": true,
+  "exports": {
+    "./retriever": {
+      "types": "./src/pipeline/retriever.ts",
+      "import": "./src/pipeline/retriever.ts",
+      "default": "./src/pipeline/retriever.ts"
+    },
+    "./indexer": {
+      "types": "./src/pipeline/indexer.ts",
+      "import": "./src/pipeline/indexer.ts",
+      "default": "./src/pipeline/indexer.ts"
+    }
+  },
   "scripts": {
     "start": "tsx src/main.ts",
     "chroma": "docker run -d --name chroma -p 8000:8000 chromadb/chroma",

@@ -32,6 +32,15 @@ export function collectionNameForRepo(repo: string): string {
   return `code-${safe}`;
 }
 
+/** Shared Chroma collection options for index + query (manual embeddings, cosine). */
+export function collectionOptionsForRepo(repo: string) {
+  return {
+    name: collectionNameForRepo(repo),
+    embeddingFunction: null,
+    metadata: { repo, source: "github-pr-agent", "hnsw:space": "cosine" },
+  };
+}
+
 function chunkToMetadata(chunk: Chunk): Metadata {
   return {
     path: chunk.path,
@@ -78,11 +87,9 @@ export async function indexRepo(repo: string): Promise<IndexResult> {
 
     const embedded = await embedChunks(chunks);
     const client = createChromaClient();
-    const collection = await client.getOrCreateCollection({
-      name: collectionName,
-      embeddingFunction: null,
-      metadata: { repo, source: "github-pr-agent" },
-    });
+    const collection = await client.getOrCreateCollection(
+      collectionOptionsForRepo(repo)
+    );
 
     await upsertEmbeddedChunks(collection, embedded);
 

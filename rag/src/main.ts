@@ -1,3 +1,4 @@
+import "./load_env.js";
 import { createChromaClient } from "./db/chroma";
 
 async function main() {

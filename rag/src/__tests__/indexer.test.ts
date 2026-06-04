@@ -100,7 +100,11 @@ describe("indexRepo", () => {
     expect(mockGetOrCreateCollection).toHaveBeenCalledWith({
       name: "code-octocat--Hello-World",
       embeddingFunction: null,
-      metadata: { repo: "octocat/Hello-World", source: "github-pr-agent" },
+      metadata: {
+        repo: "octocat/Hello-World",
+        source: "github-pr-agent",
+        "hnsw:space": "cosine",
+      },
     });
     expect(mockUpsert).toHaveBeenCalledWith({
       ids: ["chunk-1"],

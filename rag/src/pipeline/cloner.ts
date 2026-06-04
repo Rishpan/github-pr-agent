@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import os from "os";
 import simpleGit from "simple-git";
 import { logger } from "../lib/logger";
 
@@ -19,7 +20,7 @@ export async function cloneRepo(repo: string): Promise<string> {
   }
 
   const log = logger.child({ tool: "cloner", repo });
-  const dest = path.join("/tmp", "github-pr-agent", owner, repoName);
+  const dest = path.join(os.tmpdir(), "github-pr-agent", owner, repoName);
 
   try {
     if (fs.existsSync(path.join(dest, ".git"))) {

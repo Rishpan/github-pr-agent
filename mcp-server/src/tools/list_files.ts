@@ -7,7 +7,8 @@ export const ListFilesSchema = z.object({
     .describe("GitHub repository in owner/repo format (e.g. 'octocat/Hello-World')"),
   directory: z
     .string()
-    .describe("Directory to list files from (e.g. 'src')"),
+    .default("")
+    .describe("Directory to list (e.g. 'src'). Empty string lists the repo root."),
 });
 
 export type ListFilesInput = z.infer<typeof ListFilesSchema>;

@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 export const chromaConfig = {
   host: process.env.CHROMA_HOST ?? "localhost",
   port: parseInt(process.env.CHROMA_PORT ?? "8000", 10),
