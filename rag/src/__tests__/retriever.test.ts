@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { QueryResult } from "chromadb";
 
 const mockQuery = vi.fn();
+const mockCount = vi.fn();
 const mockGetOrCreateCollection = vi.fn();
 const mockEmbedText = vi.fn();
 
@@ -15,7 +16,11 @@ vi.mock("../pipeline/embedder", () => ({
   embedText: (...args: unknown[]) => mockEmbedText(...args),
 }));
 
-import { semanticSearch, getCollection } from "../pipeline/retriever";
+import {
+  semanticSearch,
+  getCollection,
+  rankSearchResults,
+} from "../pipeline/retriever";
 
 const sampleMetadata = {
   path: "src/foo.ts",
@@ -24,6 +29,7 @@ const sampleMetadata = {
   startLine: 1,
   endLine: 10,
   classNames: "Foo,Bar",
+  fileKind: "source",
 };
 
 function queryResult(overrides: Partial<QueryResult> = {}): QueryResult {
@@ -48,10 +54,15 @@ function queryResult(overrides: Partial<QueryResult> = {}): QueryResult {
 
 beforeEach(() => {
   mockQuery.mockReset();
+  mockCount.mockReset();
   mockGetOrCreateCollection.mockReset();
   mockEmbedText.mockReset();
 
-  mockGetOrCreateCollection.mockResolvedValue({ query: mockQuery });
+  mockCount.mockResolvedValue(100);
+  mockGetOrCreateCollection.mockResolvedValue({
+    query: mockQuery,
+    count: mockCount,
+  });
   mockEmbedText.mockResolvedValue([0.1, 0.2, 0.3]);
 });
 
@@ -71,25 +82,74 @@ describe("getCollection", () => {
   });
 });
 
+describe("rankSearchResults", () => {
+  it("boosts source paths when preferSource is true", () => {
+    const ranked = rankSearchResults(
+      [
+        {
+          content: "test",
+          path: "test/index_test.ts",
+          repo: "o/r",
+          startLine: 1,
+          endLine: 2,
+          language: "typescript",
+          classNames: [],
+          fileKind: "test",
+          vectorScore: 0.6,
+        },
+        {
+          content: "src",
+          path: "src/index.ts",
+          repo: "o/r",
+          startLine: 1,
+          endLine: 2,
+          language: "typescript",
+          classNames: [],
+          fileKind: "source",
+          vectorScore: 0.58,
+        },
+      ],
+      2,
+      { preferSource: true }
+    );
+
+    expect(ranked[0].path).toBe("src/index.ts");
+    expect(ranked[0].similarityScore).toBeGreaterThan(0.58);
+  });
+
+  it("keeps at least one hit when relative cutoff would remove all", () => {
+    const ranked = rankSearchResults(
+      [
+        {
+          content: "a",
+          path: "src/a.ts",
+          repo: "o/r",
+          startLine: 1,
+          endLine: 1,
+          language: "typescript",
+          classNames: [],
+          fileKind: "source",
+          vectorScore: 0.46,
+        },
+      ],
+      5
+    );
+
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].matchStrength).toBe("weak");
+  });
+});
+
 describe("semanticSearch", () => {
-  it("queries the indexed collection and applies null + similarity filters", async () => {
+  it("over-fetches, filters nulls, and returns ranked hits", async () => {
     mockQuery.mockResolvedValue(queryResult());
 
     const results = await semanticSearch("auth bug", "octocat/Hello-World", 3);
 
-    expect(mockGetOrCreateCollection).toHaveBeenCalledWith({
-      name: "code-octocat--Hello-World",
-      embeddingFunction: null,
-      metadata: {
-        repo: "octocat/Hello-World",
-        source: "github-pr-agent",
-        "hnsw:space": "cosine",
-      },
-    });
-    expect(mockEmbedText).toHaveBeenCalledWith("auth bug", "query");
+    expect(mockCount).toHaveBeenCalled();
     expect(mockQuery).toHaveBeenCalledWith({
       queryEmbeddings: [[0.1, 0.2, 0.3]],
-      nResults: 3,
+      nResults: 9,
       where: undefined,
     });
     expect(results).toHaveLength(1);
@@ -98,11 +158,13 @@ describe("semanticSearch", () => {
       path: "src/foo.ts",
       repo: "octocat/Hello-World",
       classNames: ["Foo", "Bar"],
-      similarityScore: 0.9,
+      vectorScore: 0.9,
+      similarityScore: 0.94,
+      matchStrength: "strong",
     });
   });
 
-  it("returns empty results when every hit is below the threshold", async () => {
+  it("returns empty results when every hit is below the absolute floor", async () => {
     mockQuery.mockResolvedValue(
       queryResult({
         ids: [["chunk-1"]],
@@ -117,16 +179,53 @@ describe("semanticSearch", () => {
     expect(results).toEqual([]);
   });
 
+  it("passes merged where filters for excludeTests", async () => {
+    mockQuery.mockResolvedValue(queryResult());
+
+    await semanticSearch("auth bug", "octocat/Hello-World", 3, {
+      excludeTests: true,
+    });
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      queryEmbeddings: [[0.1, 0.2, 0.3]],
+      nResults: 9,
+      where: { fileKind: { $ne: "test" } },
+    });
+  });
+
   it("passes an optional metadata where filter to Chroma", async () => {
     mockQuery.mockResolvedValue(queryResult());
     const where = { language: "typescript" };
 
-    await semanticSearch("auth bug", "octocat/Hello-World", 3, where);
+    await semanticSearch("auth bug", "octocat/Hello-World", 3, { where });
 
     expect(mockQuery).toHaveBeenCalledWith({
       queryEmbeddings: [[0.1, 0.2, 0.3]],
-      nResults: 3,
+      nResults: 9,
       where,
     });
+  });
+
+  it("post-filters test paths when excludeTests is set", async () => {
+    mockQuery.mockResolvedValue(
+      queryResult({
+        ids: [["t1", "s1"]],
+        documents: [["test body", "src body"]],
+        metadatas: [
+          [
+            { ...sampleMetadata, path: "test/foo.test.ts", fileKind: "test" },
+            { ...sampleMetadata, path: "src/foo.ts", fileKind: "source" },
+          ],
+        ],
+        distances: [[0.15, 0.2]],
+      })
+    );
+
+    const results = await semanticSearch("auth", "octocat/Hello-World", 5, {
+      excludeTests: true,
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].path).toBe("src/foo.ts");
   });
 });

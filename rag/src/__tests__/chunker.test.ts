@@ -5,6 +5,9 @@ import {
   nonWhitespaceSize,
   rebuildCode,
   MAX_CHUNK_SIZE,
+  classifyFileKind,
+  buildEmbeddingText,
+  extractFirstJsdocSummary,
 } from "../pipeline/chunker";
 import * as TreeSitter from "web-tree-sitter";
 
@@ -31,6 +34,42 @@ function windowSize(window: TreeSitter.Node[], source: string): number {
 describe("nonWhitespaceSize", () => {
   it("ignores whitespace", () => {
     expect(nonWhitespaceSize("a b\n\tc")).toBe(3);
+  });
+});
+
+describe("classifyFileKind", () => {
+  it("marks test paths", () => {
+    expect(classifyFileKind("test/index_test.ts")).toBe("test");
+    expect(classifyFileKind("src/__tests__/auth.test.ts")).toBe("test");
+  });
+
+  it("marks source paths", () => {
+    expect(classifyFileKind("src/index.ts")).toBe("source");
+    expect(classifyFileKind("lib/util.ts")).toBe("source");
+  });
+});
+
+describe("extractFirstJsdocSummary", () => {
+  it("returns the first summary line", () => {
+    const summary = extractFirstJsdocSummary(
+      "/** Register handlers.\n * @param x\n */\nfunction on() {}"
+    );
+    expect(summary).toBe("Register handlers.");
+  });
+});
+
+describe("buildEmbeddingText", () => {
+  it("includes path, symbols, and body", async () => {
+    const chunks = await chunkFile(
+      `/** Tiny emitter */\nexport function on() {}\n`,
+      "src/index.ts",
+      "owner/repo"
+    );
+    const text = buildEmbeddingText(chunks[0]);
+    expect(text).toContain("File: src/index.ts");
+    expect(text).toContain("Symbols:");
+    expect(text).toContain("Tiny emitter");
+    expect(text).toContain("export function on()");
   });
 });
 

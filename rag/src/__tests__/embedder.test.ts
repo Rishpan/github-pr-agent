@@ -71,6 +71,9 @@ describe("embedChunks", () => {
     startLine: 1,
     endLine: 5,
     classNames: [],
+    functionNames: ["foo"],
+    fileKind: "source",
+    jsdocSummary: null,
   };
 
   it("returns embedded chunks aligned with input", async () => {

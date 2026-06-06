@@ -16,7 +16,9 @@ const sampleHit = {
   endLine: 10,
   language: "typescript",
   classNames: ["AuthService"],
+  vectorScore: 0.91,
   similarityScore: 0.91,
+  matchStrength: "strong" as const,
 };
 
 beforeEach(() => {
@@ -24,23 +26,26 @@ beforeEach(() => {
 });
 
 describe("semanticSearch", () => {
-  it("calls the RAG pipeline with query, repo, and topK", async () => {
+  it("calls the RAG pipeline with query, repo, topK, and options", async () => {
     mockSemanticSearch.mockResolvedValue([sampleHit]);
 
     await semanticSearch({
       query: "where is auth handled?",
       repo: "octocat/Hello-World",
       topK: 3,
+      excludeTests: true,
+      preferSource: false,
     });
 
     expect(mockSemanticSearch).toHaveBeenCalledWith(
       "where is auth handled?",
       "octocat/Hello-World",
-      3
+      3,
+      { excludeTests: true, preferSource: false }
     );
   });
 
-  it("formats pipeline results for the MCP response", async () => {
+  it("formats pipeline results with similarity and match strength", async () => {
     mockSemanticSearch.mockResolvedValue([sampleHit]);
 
     const out = await semanticSearch({
@@ -49,7 +54,7 @@ describe("semanticSearch", () => {
       topK: 5,
     });
 
-    expect(out).toContain("Result 1 (similarity: 0.91)");
+    expect(out).toContain("Result 1 (similarity: 0.91, match: strong)");
     expect(out).toContain("File: src/auth.ts");
     expect(out).toContain("Lines: 1-10");
     expect(out).toContain("Classes: AuthService");

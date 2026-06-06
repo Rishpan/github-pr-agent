@@ -27,7 +27,7 @@ MCP client (stdio) or npm run dev
   agent/               (planned) issue → plan → draft PR
 ```
 
-Clones land under the OS temp dir (`%TEMP%\github-pr-agent\...` on Windows, `$TMP/...` elsewhere). Each repo gets a Chroma collection `code-<owner>--<repo>`. `semanticSearch()` drops hits below a 0.5 similarity score.
+Clones land under the OS temp dir (`%TEMP%\github-pr-agent\...` on Windows, `$TMP/...` elsewhere). Each repo gets a Chroma collection `code-<owner>--<repo>`. `semantic_search` over-fetches neighbors, applies a relative similarity cutoff (default floor `RAG_MIN_SIMILARITY=0.45`), optionally boosts `src/` over `test/`, and labels matches as strong/moderate/weak. Re-run `index_repo` after pipeline changes so chunks include `fileKind` metadata.
 
 ## Prerequisites
 

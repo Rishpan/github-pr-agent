@@ -63,6 +63,9 @@ const sampleChunk: Chunk = {
   startLine: 1,
   endLine: 1,
   classNames: [],
+  functionNames: ["foo"],
+  fileKind: "source",
+  jsdocSummary: null,
 };
 
 beforeEach(() => {

@@ -1,6 +1,6 @@
 import { ollamaBaseUrl, ollamaConfig } from "../lib/config";
 import { logger } from "../lib/logger";
-import type { Chunk } from "./chunker";
+import { buildEmbeddingText, type Chunk } from "./chunker";
 
 /** nomic-embed-text retrieval prefixes (https://huggingface.co/nomic-ai/nomic-embed-text) */
 export type EmbedTask = "document" | "query";
@@ -78,12 +78,12 @@ export async function embedText(
   }
 }
 
-/** Embed one chunk using its contentWithImports (includes imports for retrieval). */
+/** Embed one chunk using enriched embedding text (path, symbols, JSDoc). */
 export async function embedChunk(
   chunk: Chunk,
   task: EmbedTask = "document"
 ): Promise<EmbeddedChunk> {
-  const embedding = await embedText(chunk.contentWithImports, task);
+  const embedding = await embedText(buildEmbeddingText(chunk), task);
   return { ...chunk, embedding };
 }
 
@@ -105,7 +105,7 @@ export async function embedChunks(
   try {
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
-      const inputs = batch.map((c) => prefixForTask(c.contentWithImports, task));
+      const inputs = batch.map((c) => prefixForTask(buildEmbeddingText(c), task));
       const embeddings = await callOllamaEmbed(inputs);
 
       for (let j = 0; j < batch.length; j++) {

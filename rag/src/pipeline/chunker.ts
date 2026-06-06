@@ -64,12 +64,22 @@ const CLASS_NODE_TYPES = new Set([
   "impl_item",
 ]);
 
+const FUNCTION_NODE_TYPES = new Set([
+  "function_declaration",
+  "method_definition",
+  "function_definition",
+  "function_item",
+  "generator_function_declaration",
+]);
+
 type SyntaxNode = TreeSitter.Node;
 
 export function getGrammarForFile(filePath: string): string | null {
   const ext = path.extname(filePath).toLowerCase();
   return EXT_TO_GRAMMAR[ext] ?? null;
 }
+
+export type FileKind = "source" | "test" | "other";
 
 export interface Chunk {
   id: string;
@@ -81,6 +91,65 @@ export interface Chunk {
   startLine: number;
   endLine: number;
   classNames: string[];
+  functionNames: string[];
+  fileKind: FileKind;
+  jsdocSummary: string | null;
+}
+
+/** Classify a repo-relative path for retrieval reranking and filters. */
+export function classifyFileKind(filePath: string): FileKind {
+  const normalized = filePath.replace(/\\/g, "/").toLowerCase();
+  const base = path.basename(normalized);
+
+  if (
+    normalized.includes("/test/") ||
+    normalized.includes("/tests/") ||
+    normalized.includes("/__tests__/") ||
+    normalized.startsWith("test/") ||
+    /\.(test|spec)\.[a-z0-9]+$/.test(base) ||
+    /_(test|spec)\.[a-z0-9]+$/.test(base)
+  ) {
+    return "test";
+  }
+
+  if (
+    normalized.startsWith("src/") ||
+    normalized.startsWith("lib/") ||
+    normalized.startsWith("pkg/") ||
+    normalized.startsWith("internal/") ||
+    normalized.includes("/src/") ||
+    normalized.includes("/lib/")
+  ) {
+    return "source";
+  }
+
+  return "other";
+}
+
+/** First non-empty JSDoc summary line from chunk text (embedding hint only). */
+export function extractFirstJsdocSummary(content: string): string | null {
+  const block = content.match(/\/\*\*([\s\S]*?)\*\//);
+  if (!block) return null;
+
+  for (const line of block[1].split("\n")) {
+    const cleaned = line.replace(/^\s*\*\s?/, "").trim();
+    if (cleaned && !cleaned.startsWith("@")) return cleaned;
+  }
+  return null;
+}
+
+/** Text sent to the embedder (not returned to search clients). */
+export function buildEmbeddingText(chunk: Chunk): string {
+  const parts = [`File: ${chunk.path}`];
+  const symbols = [...chunk.classNames, ...chunk.functionNames];
+  if (symbols.length > 0) {
+    parts.push(`Symbols: ${symbols.join(", ")}`);
+  }
+  if (chunk.jsdocSummary) {
+    parts.push(chunk.jsdocSummary);
+  }
+  parts.push(chunk.contentWithImports);
+  return parts.join("\n");
 }
 
 let initialized = false;
@@ -164,23 +233,32 @@ function getNodeName(node: SyntaxNode, source: string): string | null {
 function extractMetadata(
   nodes: SyntaxNode[],
   source: string
-): { classNames: string[] } {
+): { classNames: string[]; functionNames: string[] } {
   const classNames: string[] = [];
-  const seen = new Set<string>();
+  const functionNames: string[] = [];
+  const seenClasses = new Set<string>();
+  const seenFunctions = new Set<string>();
 
   function walk(node: SyntaxNode) {
     if (CLASS_NODE_TYPES.has(node.type)) {
       const name = getNodeName(node, source);
-      if (name && !seen.has(name)) {
-        seen.add(name);
+      if (name && !seenClasses.has(name)) {
+        seenClasses.add(name);
         classNames.push(name);
+      }
+    }
+    if (FUNCTION_NODE_TYPES.has(node.type)) {
+      const name = getNodeName(node, source);
+      if (name && !seenFunctions.has(name)) {
+        seenFunctions.add(name);
+        functionNames.push(name);
       }
     }
     for (const child of node.children) walk(child);
   }
 
   for (const node of nodes) walk(node);
-  return { classNames };
+  return { classNames, functionNames };
 }
 
 function extractImports(root: SyntaxNode, source: string): string {
@@ -299,7 +377,7 @@ function windowsToChunks(
       const content = rebuildCode(window, source);
       const startLine = window[0].startPosition.row + 1;
       const endLine = window[window.length - 1].endPosition.row + 1;
-      const { classNames } = extractMetadata(window, source);
+      const { classNames, functionNames } = extractMetadata(window, source);
 
       const contentWithImports = importBlock
         ? `${importBlock}\n\n${content}`
@@ -315,6 +393,9 @@ function windowsToChunks(
         startLine,
         endLine,
         classNames,
+        functionNames,
+        fileKind: classifyFileKind(filePath),
+        jsdocSummary: extractFirstJsdocSummary(content),
       };
     })
     .filter((chunk) => nonWhitespaceSize(chunk.content) >= MIN_CHUNK_SIZE);

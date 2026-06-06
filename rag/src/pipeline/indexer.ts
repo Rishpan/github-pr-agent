@@ -49,6 +49,7 @@ function chunkToMetadata(chunk: Chunk): Metadata {
     startLine: chunk.startLine,
     endLine: chunk.endLine,
     classNames: chunk.classNames.join(","),
+    fileKind: chunk.fileKind,
   };
 }
 

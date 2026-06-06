@@ -71,17 +71,29 @@ server.registerTool("semantic_search", {
   description:
     "Search indexed code in Chroma by natural-language query (run index_repo on the repo first)",
   inputSchema: SemanticSearchSchema.shape,
-}, async ({ query, repo, topK }) => {
+}, async ({ query, repo, topK, excludeTests, preferSource }) => {
   const start = Date.now();
-  logger.info({ tool: "semantic_search", input: { query, repo, topK } }, "tool_call_start");
+  logger.info(
+    { tool: "semantic_search", input: { query, repo, topK, excludeTests, preferSource } },
+    "tool_call_start"
+  );
   try {
-    const results = await semanticSearch({ query, repo, topK });
+    const results = await semanticSearch({
+      query,
+      repo,
+      topK,
+      excludeTests,
+      preferSource,
+    });
     logger.info({ tool: "semantic_search", durationMs: Date.now() - start }, "tool_call_success");
     return {
       content: [{ type: "text", text: results }],
     };
   } catch (err) {
-    logger.error({ tool: "semantic_search", input: { query, repo, topK }, err }, "tool_call_error");
+    logger.error(
+      { tool: "semantic_search", input: { query, repo, topK, excludeTests, preferSource }, err },
+      "tool_call_error"
+    );
     throw err;
   }
 });

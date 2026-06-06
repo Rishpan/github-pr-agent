@@ -15,3 +15,13 @@ export const ollamaConfig = {
 export function ollamaBaseUrl(): string {
   return `http://${ollamaConfig.host}:${ollamaConfig.port}`;
 }
+
+/** Semantic search tuning (see rag/.env.example). */
+export const retrieverConfig = {
+  minSimilarity: parseFloat(process.env.RAG_MIN_SIMILARITY ?? "0.45"),
+  relativeCutoffDelta: parseFloat(process.env.RAG_RELATIVE_CUTOFF_DELTA ?? "0.08"),
+  overFetchMultiplier: parseInt(process.env.RAG_OVER_FETCH_MULTIPLIER ?? "3", 10),
+  maxOverFetch: parseInt(process.env.RAG_MAX_OVER_FETCH ?? "50", 10),
+  sourcePathBoost: parseFloat(process.env.RAG_SOURCE_PATH_BOOST ?? "0.04"),
+  testPathPenalty: parseFloat(process.env.RAG_TEST_PATH_PENALTY ?? "0.04"),
+};
