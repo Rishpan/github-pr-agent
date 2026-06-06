@@ -205,6 +205,40 @@ export async function semanticSearch(
   return rankSearchResults(raw, topK, { preferSource });
 }
 
+export function truncateChunkContent(
+  content: string,
+  maxChars: number = retrieverConfig.maxResultChunkChars
+): string {
+  if (content.length <= maxChars) {
+    return content;
+  }
+  return `${content.slice(0, maxChars)}\n... [truncated — use get_file with the path above for full content]`;
+}
+
+export function formatSearchResultsText(
+  results: ChunkSearchResult[],
+  query: string
+): string {
+  if (results.length === 0) {
+    return `No relevant chunks found for query: ${query}`;
+  }
+
+  return results
+    .map(
+      (r, i) => `
+    Result ${i + 1} (similarity: ${r.similarityScore.toFixed(2)}, match: ${r.matchStrength})
+    File: ${r.path}
+    Lines: ${r.startLine}-${r.endLine}
+    Language: ${r.language}
+    Classes: ${r.classNames.length > 0 ? r.classNames.join(", ") : "none"}
+
+    ${truncateChunkContent(r.content)}
+
+    ---`
+    )
+    .join("\n");
+}
+
 export async function embedQuery(query: string): Promise<number[]> {
   return await embedText(query, "query");
 }

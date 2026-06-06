@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockIssuesList } = vi.hoisted(() => ({
-  mockIssuesList: vi.fn(),
+const { mockIssuesListForRepo } = vi.hoisted(() => ({
+  mockIssuesListForRepo: vi.fn(),
 }));
 
 vi.mock("@octokit/rest", () => ({
   Octokit: class {
     issues = {
-      list: mockIssuesList,
+      listForRepo: mockIssuesListForRepo,
     };
   },
 }));
@@ -15,12 +15,12 @@ vi.mock("@octokit/rest", () => ({
 import { listIssues } from "./list_issues.js";
 
 beforeEach(() => {
-  mockIssuesList.mockReset();
+  mockIssuesListForRepo.mockReset();
 });
 
 describe("listIssues", () => {
   it("returns formatted open issues filtered by label", async () => {
-    mockIssuesList.mockResolvedValue({
+    mockIssuesListForRepo.mockResolvedValue({
       data: [
         {
           number: 1234,
@@ -58,7 +58,7 @@ Labels: good-first-issue
 ---`
     );
 
-    expect(mockIssuesList).toHaveBeenCalledWith({
+    expect(mockIssuesListForRepo).toHaveBeenCalledWith({
       owner: "facebook",
       repo: "react",
       state: "open",
@@ -68,7 +68,7 @@ Labels: good-first-issue
   });
 
   it("returns formatted open issues without a label filter", async () => {
-    mockIssuesList.mockResolvedValue({
+    mockIssuesListForRepo.mockResolvedValue({
       data: [
         {
           number: 42,
@@ -83,17 +83,16 @@ Labels: good-first-issue
 
     expect(result).toContain("Open issues for octocat/Hello-World:");
     expect(result).toContain("#42 — Something broke");
-    expect(mockIssuesList).toHaveBeenCalledWith({
+    expect(mockIssuesListForRepo).toHaveBeenCalledWith({
       owner: "octocat",
       repo: "Hello-World",
       state: "open",
-      labels: undefined,
       per_page: 10,
     });
   });
 
   it("excludes pull requests from the results", async () => {
-    mockIssuesList.mockResolvedValue({
+    mockIssuesListForRepo.mockResolvedValue({
       data: [
         {
           number: 10,
@@ -118,7 +117,7 @@ Labels: good-first-issue
   });
 
   it("returns empty message when no open issues match the label", async () => {
-    mockIssuesList.mockResolvedValue({ data: [] });
+    mockIssuesListForRepo.mockResolvedValue({ data: [] });
 
     const result = await listIssues({
       repo: "facebook/react",
@@ -131,7 +130,7 @@ Labels: good-first-issue
   });
 
   it("returns empty message when no open issues exist", async () => {
-    mockIssuesList.mockResolvedValue({ data: [] });
+    mockIssuesListForRepo.mockResolvedValue({ data: [] });
 
     const result = await listIssues({ repo: "octocat/Hello-World" });
 
@@ -147,7 +146,7 @@ Labels: good-first-issue
   });
 
   it("wraps GitHub failures in ListIssuesError", async () => {
-    mockIssuesList.mockRejectedValue(new Error("API rate limit exceeded"));
+    mockIssuesListForRepo.mockRejectedValue(new Error("API rate limit exceeded"));
 
     await expect(
       listIssues({ repo: "facebook/react", label: "bug" })

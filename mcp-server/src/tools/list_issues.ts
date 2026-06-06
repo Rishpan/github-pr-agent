@@ -90,11 +90,11 @@ export async function listIssues(input: ListIssuesInput): Promise<string> {
   const octokit = getOctokit();
 
   try {
-    const { data: items } = await octokit.issues.list({
+    const { data: items } = await octokit.issues.listForRepo({
       owner,
       repo: name,
       state: "open",
-      labels: label,
+      ...(label ? { labels: label } : {}),
       per_page: 10,
     });
 

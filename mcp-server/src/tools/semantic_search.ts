@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   semanticSearch as semanticSearchPipeline,
-  type MatchStrength,
+  formatSearchResultsText,
 } from "github-pr-agent-rag/retriever";
 
 export const SemanticSearchSchema = z.object({
@@ -13,9 +13,9 @@ export const SemanticSearchSchema = z.object({
     .number()
     .int()
     .positive()
-    .default(12)
+    .default(5)
     .describe(
-      "Maximum number of chunks to return (use 12+ on small repos; over-fetch retrieves more before ranking)"
+      "Maximum number of chunks to return (3–5 is enough for agents; results are truncated previews)"
     ),
   excludeTests: z
     .boolean()
@@ -29,10 +29,6 @@ export const SemanticSearchSchema = z.object({
 /** Caller input; fields with `.default()` in the schema are optional. */
 export type SemanticSearchInput = z.input<typeof SemanticSearchSchema>;
 
-function formatMatchStrength(strength: MatchStrength): string {
-  return strength;
-}
-
 export async function semanticSearch(input: SemanticSearchInput): Promise<string> {
   const { query, repo, topK, excludeTests, preferSource } =
     SemanticSearchSchema.parse(input);
@@ -41,22 +37,5 @@ export async function semanticSearch(input: SemanticSearchInput): Promise<string
     preferSource,
   });
 
-  if (results.length === 0) {
-    return "No relevant chunks found for query: " + query;
-  }
-
-  return results
-    .map(
-      (r, i) => `
-    Result ${i + 1} (similarity: ${r.similarityScore.toFixed(2)}, match: ${formatMatchStrength(r.matchStrength)})
-    File: ${r.path}
-    Lines: ${r.startLine}-${r.endLine}
-    Language: ${r.language}
-    Classes: ${r.classNames.length > 0 ? r.classNames.join(", ") : "none"}
-
-    ${r.content}
-
-    ---`
-    )
-    .join("\n");
+  return formatSearchResultsText(results, query);
 }

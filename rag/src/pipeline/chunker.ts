@@ -12,8 +12,8 @@ import fs from "fs/promises";
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build"]);
 const { Parser, Language } = TreeSitter;
 
-/** @see arXiv:2506.15655 §4 — default max_chunk_size 2000 (non-whitespace chars) */
-export const MAX_CHUNK_SIZE = 2000;
+/** @see arXiv:2506.15655 §4 — max non-whitespace chars per indexed chunk */
+export const MAX_CHUNK_SIZE = parseInt(process.env.RAG_MAX_CHUNK_SIZE ?? "1200", 10);
 
 /** Skip tiny windows (e.g. lone braces or whitespace-only nodes). */
 export const MIN_CHUNK_SIZE = 50;

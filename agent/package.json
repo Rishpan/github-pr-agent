@@ -2,13 +2,19 @@
   "name": "github-pr-agent",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "start": "ts-node src/index.ts"
+  },
   "dependencies": {
-    "@google/generative-ai": "^0.24.0",
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@ai-sdk/google": "^1.2.22",
+    "@ai-sdk/groq": "^1.2.9",
+    "ai": "^4.3.19",
+    "dotenv": "^17.4.2",
+    "pino": "^10.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.17",
-    "tsx": "^4.22.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
 }

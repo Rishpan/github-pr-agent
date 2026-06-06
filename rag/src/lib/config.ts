@@ -24,4 +24,6 @@ export const retrieverConfig = {
   maxOverFetch: parseInt(process.env.RAG_MAX_OVER_FETCH ?? "50", 10),
   sourcePathBoost: parseFloat(process.env.RAG_SOURCE_PATH_BOOST ?? "0.04"),
   testPathPenalty: parseFloat(process.env.RAG_TEST_PATH_PENALTY ?? "0.04"),
+  /** Max chars of chunk code returned to LLM clients (full chunk stays in Chroma). */
+  maxResultChunkChars: parseInt(process.env.RAG_MAX_RESULT_CHUNK_CHARS ?? "800", 10),
 };

@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSemanticSearch = vi.fn();
 
-vi.mock("github-pr-agent-rag/retriever", () => ({
-  semanticSearch: (...args: unknown[]) => mockSemanticSearch(...args),
-}));
+vi.mock("github-pr-agent-rag/retriever", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("github-pr-agent-rag/retriever")>();
+  return {
+    ...actual,
+    semanticSearch: (...args: unknown[]) => mockSemanticSearch(...args),
+  };
+});
 
 import { semanticSearch } from "./semantic_search.js";
 
@@ -73,5 +77,23 @@ describe("semanticSearch", () => {
     expect(out).toBe(
       "No relevant chunks found for query: nonexistent feature"
     );
+  });
+
+  it("truncates long chunk content in formatted output", async () => {
+    mockSemanticSearch.mockResolvedValue([
+      {
+        ...sampleHit,
+        content: "x".repeat(2000),
+      },
+    ]);
+
+    const out = await semanticSearch({
+      query: "auth",
+      repo: "octocat/Hello-World",
+      topK: 1,
+    });
+
+    expect(out).toContain("[truncated — use get_file");
+    expect(out.length).toBeLessThan(2000);
   });
 });
