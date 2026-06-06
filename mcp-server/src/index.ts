@@ -10,6 +10,8 @@ import {
   CreateDraftPRSchema,
   createDraftPR,
 } from "./tools/create_draft_pr.js";
+import { GetIssueSchema, getIssue } from "./tools/get_issue.js";
+import { ListIssuesSchema, listIssues } from "./tools/list_issues.js";
 import { logger } from "./logger.js";
 
 const server = new McpServer({
@@ -130,6 +132,42 @@ server.registerTool("create_draft_pr", {
       },
       "tool_call_error"
     );
+    throw err;
+  }
+});
+
+server.registerTool("get_issue", {
+  description: "Fetch a GitHub issue and its comments from an upstream repository",
+  inputSchema: GetIssueSchema.shape,
+}, async ({ repo, issueNumber }) => {
+  const start = Date.now();
+  logger.info({ tool: "get_issue", input: { repo, issueNumber } }, "tool_call_start");
+  try {
+    const result = await getIssue({ repo, issueNumber });
+    logger.info({ tool: "get_issue", durationMs: Date.now() - start }, "tool_call_success");
+    return {
+      content: [{ type: "text", text: result }],
+    };
+  } catch (err) {
+    logger.error({ tool: "get_issue", input: { repo, issueNumber }, err }, "tool_call_error");
+    throw err;
+  }
+});
+
+server.registerTool("list_issues", {
+  description: "List open GitHub issues for an upstream repository, optionally filtered by label",
+  inputSchema: ListIssuesSchema.shape,
+}, async ({ repo, label }) => {
+  const start = Date.now();
+  logger.info({ tool: "list_issues", input: { repo, label } }, "tool_call_start");
+  try {
+    const result = await listIssues({ repo, label });
+    logger.info({ tool: "list_issues", durationMs: Date.now() - start }, "tool_call_success");
+    return {
+      content: [{ type: "text", text: result }],
+    };
+  } catch (err) {
+    logger.error({ tool: "list_issues", input: { repo, label }, err }, "tool_call_error");
     throw err;
   }
 });
