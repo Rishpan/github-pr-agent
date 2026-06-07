@@ -38,25 +38,29 @@ rag/                      clone → chunk → embed → Chroma
 
 The agent runs this flow autonomously. You can also call the MCP tools manually from Cursor or another MCP client.
 
+### Demo bot account
+
+Forks and draft PRs are created under the dedicated demo GitHub account **[pr-agent-demo](https://github.com/pr-agent-demo)** (e.g. `pr-agent-demo/express` when fixing `expressjs/express`). This keeps upstream repos untouched. For your own runs, set `GITHUB_BOT_TOKEN` to a PAT for a bot account you control — do not commit tokens.
+
 ## MCP tools
 
 | Tool | Description |
 |------|-------------|
 | `get_issue` | Fetch an issue and its comments |
 | `list_issues` | List open issues for a repo, optionally filtered by label |
-| `get_file` | Raw file content from a public repo |
+| `get_file` | Raw file content from a public repo; optional `startLine`/`endLine` for ranged reads |
 | `list_files` | List a directory (`directory` defaults to repo root) |
 | `fork_repo` | Fork upstream into the bot account (idempotent) |
 | `create_draft_pr` | Branch on the fork, commit a file, open a draft PR |
-| `index_repo` | Clone, chunk, embed, upsert into Chroma (slow) |
-| `semantic_search` | Query indexed code (`index_repo` first) |
+| `index_repo` | Clone, chunk, embed, upsert into Chroma; skips if already indexed unless `force=true` |
+| `semantic_search` | Query indexed code — returns file locations and symbols, not code bodies |
 
 ## Prerequisites
 
 - Node 18+
 - [Ollama](https://ollama.com/) with `nomic-embed-text`
 - Chroma (Docker Desktop on Windows is typical), or Chroma Cloud via env vars
-- `GITHUB_BOT_TOKEN` — PAT for the bot account (`fork_repo`, `create_draft_pr`)
+- `GITHUB_BOT_TOKEN` — PAT for the bot account (`fork_repo`, `create_draft_pr`); demos use [pr-agent-demo](https://github.com/pr-agent-demo)
 - Optional: `GITHUB_TOKEN` — improves GitHub rate limits for read-only calls
 - For the agent: a [Gemini](https://aistudio.google.com/apikey) or [Groq](https://console.groq.com/keys) API key
 
@@ -77,7 +81,7 @@ cp agent/.env.example agent/.env
 | Variable | Purpose |
 |----------|---------|
 | `GITHUB_TOKEN` | Optional; public repo reads |
-| `GITHUB_BOT_TOKEN` | Required for fork + draft PR tools |
+| `GITHUB_BOT_TOKEN` | Required for fork + draft PR tools (demo account: [pr-agent-demo](https://github.com/pr-agent-demo)) |
 | `CHROMA_*`, `OLLAMA_*` | Same as `rag/` (index + search) |
 
 **rag**
@@ -87,14 +91,16 @@ cp agent/.env.example agent/.env
 | `CHROMA_HOST`, `CHROMA_PORT` | Chroma server |
 | `OLLAMA_HOST`, `OLLAMA_PORT`, `OLLAMA_EMBED_MODEL` | Embeddings |
 | `GITHUB_PR_AGENT_CLONE_CACHE` | Optional; persistent clone dir (default: OS temp) |
-| `RAG_*` | Semantic search tuning (see `rag/.env.example`) |
+| `RAG_SEARCH_RESULT_MODE` | `metadata` (default) or `preview` for semantic search output |
+| `RAG_MAX_GET_FILE_LINES` | Cap ranged `get_file` reads (default: `150`) |
+| `RAG_*` | Other search/index tuning (see `rag/.env.example`) |
 
 **agent**
 
 | Variable | Purpose |
 |----------|---------|
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API key (default provider) |
-| `GOOGLE_MODEL` | Default: `gemini-1.5-flash` |
+| `GOOGLE_MODEL` | Default: `gemini-2.5-flash` (1.5 models are shut down) |
 | `GROQ_API_KEY` | Groq API key (when using Groq) |
 | `GROQ_MODEL` | Default: `llama-3.1-8b-instant` (70b hits TPM limits quickly) |
 | `LLM_PROVIDER` | Set to `groq` to use Groq; omit for Gemini |
@@ -160,7 +166,9 @@ npm run clean:clones -- --yes --all              # all managed clones
 
 The script only deletes directories under the clone cache with a `.git` folder at `owner/repo` depth.
 
-Each indexed repo gets a Chroma collection `code-<owner>--<repo>`. `semantic_search` over-fetches neighbors, applies a relative similarity cutoff (default floor `RAG_MIN_SIMILARITY=0.45`), optionally boosts `src/` over `test/`, and labels matches as strong/moderate/weak. Chunk previews returned to the LLM are truncated (`RAG_MAX_RESULT_CHUNK_CHARS`, default `800`).
+Each indexed repo gets a Chroma collection `code-<owner>--<repo>`. `semantic_search` over-fetches neighbors, dedupes by file path, applies a relative similarity cutoff (default floor `RAG_MIN_SIMILARITY=0.45`), optionally boosts `src/` over `test/`, and returns metadata-only locations by default (path, lines, symbols, JSDoc — no code bodies). Use `get_file` with `startLine`/`endLine` to read the relevant region; omit the range for the full file when patching.
+
+Re-index existing collections after upgrading to pick up `functionNames` and `jsdocSummary` in search metadata (`index_repo` with `force=true`).
 
 ### Agent (`agent/`)
 
@@ -192,7 +200,7 @@ npm start -- --repo expressjs/express --dry-run
 
 The agent loads env from `agent/.env`. MCP inherits `process.env`, so tokens and Chroma/Ollama settings from `mcp-server/.env` and `rag/.env` must be available — run from a shell where those are loaded, or copy the needed vars into `agent/.env`.
 
-**Token usage:** Multi-step runs can hit provider TPM limits, especially on Groq's free tier with larger models. Current mitigations: truncated search previews, `topK` default of 5 (prompt guides the agent to use 3), and a smaller default Groq model. A fuller fix (metadata-only search, ranged `get_file`, skip redundant indexing) is planned in [`.cursor/plans/agent-token-budget-fix.md`](.cursor/plans/agent-token-budget-fix.md).
+**Token usage:** Search returns locations only; investigation uses ranged `get_file` reads (capped at `RAG_MAX_GET_FILE_LINES`); repeat runs skip re-indexing when Chroma already has chunks. Set `RAG_SEARCH_RESULT_MODE=preview` to restore truncated code snippets for debugging.
 
 ## Tests
 
