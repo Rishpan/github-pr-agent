@@ -1,10 +1,9 @@
-import dotenv from "dotenv";
-import path from "path";
 import pino from "pino";
+import { loadAgentEnv } from "./load_env";
 import { runAgent } from "./agent";
 import type { AgentRequest } from "./prompt";
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+loadAgentEnv();
 
 const logger = pino({ name: "github-pr-agent-agent" }, pino.destination(2));
 
