@@ -16,6 +16,8 @@ export function ollamaBaseUrl(): string {
   return `http://${ollamaConfig.host}:${ollamaConfig.port}`;
 }
 
+export type SearchResultMode = "metadata" | "preview";
+
 /** Semantic search tuning (see rag/.env.example). */
 export const retrieverConfig = {
   minSimilarity: parseFloat(process.env.RAG_MIN_SIMILARITY ?? "0.45"),
@@ -24,6 +26,10 @@ export const retrieverConfig = {
   maxOverFetch: parseInt(process.env.RAG_MAX_OVER_FETCH ?? "50", 10),
   sourcePathBoost: parseFloat(process.env.RAG_SOURCE_PATH_BOOST ?? "0.04"),
   testPathPenalty: parseFloat(process.env.RAG_TEST_PATH_PENALTY ?? "0.04"),
-  /** Max chars of chunk code returned to LLM clients (full chunk stays in Chroma). */
+  /** Max chars of chunk code returned in preview mode (full chunk stays in Chroma). */
   maxResultChunkChars: parseInt(process.env.RAG_MAX_RESULT_CHUNK_CHARS ?? "800", 10),
+  /** metadata = path/lines/symbols only; preview = truncated code snippets. */
+  searchResultMode: (process.env.RAG_SEARCH_RESULT_MODE ?? "metadata") as SearchResultMode,
+  /** Max lines returned by ranged get_file reads. */
+  maxGetFileLines: parseInt(process.env.RAG_MAX_GET_FILE_LINES ?? "150", 10),
 };

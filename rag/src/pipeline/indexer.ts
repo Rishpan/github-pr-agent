@@ -21,9 +21,11 @@ export class IndexerError extends Error {
 
 export interface IndexResult {
   repo: string;
-  localPath: string;
+  localPath?: string;
   chunkCount: number;
   collectionName: string;
+  /** True when an existing non-empty index was reused (no clone/embed). */
+  skipped?: boolean;
 }
 
 /** Chroma-safe collection name for owner/repo (e.g. code-octocat--Hello-World). */
@@ -49,8 +51,23 @@ function chunkToMetadata(chunk: Chunk): Metadata {
     startLine: chunk.startLine,
     endLine: chunk.endLine,
     classNames: chunk.classNames.join(","),
+    functionNames: chunk.functionNames.join(","),
     fileKind: chunk.fileKind,
+    ...(chunk.jsdocSummary ? { jsdocSummary: chunk.jsdocSummary } : {}),
   };
+}
+
+async function existingChunkCount(collectionName: string): Promise<number> {
+  const client = createChromaClient();
+  try {
+    const collection = await client.getCollection({
+      name: collectionName,
+      embeddingFunction: undefined,
+    });
+    return await collection.count();
+  } catch {
+    return 0;
+  }
 }
 
 async function upsertEmbeddedChunks(
@@ -70,10 +87,27 @@ async function upsertEmbeddedChunks(
 
 /**
  * Clone a GitHub repo, chunk it, embed chunks with Ollama, and upsert into Chroma.
+ * Skips clone/embed when the collection already has chunks unless force is true.
  */
-export async function indexRepo(repo: string): Promise<IndexResult> {
+export async function indexRepo(
+  repo: string,
+  options: { force?: boolean } = {}
+): Promise<IndexResult> {
   const log = logger.child({ tool: "indexer", repo });
   const collectionName = collectionNameForRepo(repo);
+
+  if (!options.force) {
+    const existing = await existingChunkCount(collectionName);
+    if (existing > 0) {
+      log.info({ collectionName, chunkCount: existing }, "Skipping re-index");
+      return {
+        repo,
+        chunkCount: existing,
+        collectionName,
+        skipped: true,
+      };
+    }
+  }
 
   log.info({ collectionName }, "Starting repo index");
 

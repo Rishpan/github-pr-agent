@@ -20,6 +20,8 @@ const sampleHit = {
   endLine: 10,
   language: "typescript",
   classNames: ["AuthService"],
+  functionNames: ["auth"],
+  jsdocSummary: "Authenticate a user.",
   vectorScore: 0.91,
   similarityScore: 0.91,
   matchStrength: "strong" as const,
@@ -49,7 +51,7 @@ describe("semanticSearch", () => {
     );
   });
 
-  it("formats pipeline results with similarity and match strength", async () => {
+  it("formats pipeline results as metadata-only locations by default", async () => {
     mockSemanticSearch.mockResolvedValue([sampleHit]);
 
     const out = await semanticSearch({
@@ -61,8 +63,10 @@ describe("semanticSearch", () => {
     expect(out).toContain("Result 1 (similarity: 0.91, match: strong)");
     expect(out).toContain("File: src/auth.ts");
     expect(out).toContain("Lines: 1-10");
-    expect(out).toContain("Classes: AuthService");
-    expect(out).toContain("export function auth() {}");
+    expect(out).toContain("Symbols: AuthService, auth");
+    expect(out).toContain("JSDoc: Authenticate a user.");
+    expect(out).toContain("call get_file with startLine/endLine");
+    expect(out).not.toContain("export function auth()");
   });
 
   it("returns a clear message when no chunks match", async () => {
@@ -77,23 +81,5 @@ describe("semanticSearch", () => {
     expect(out).toBe(
       "No relevant chunks found for query: nonexistent feature"
     );
-  });
-
-  it("truncates long chunk content in formatted output", async () => {
-    mockSemanticSearch.mockResolvedValue([
-      {
-        ...sampleHit,
-        content: "x".repeat(2000),
-      },
-    ]);
-
-    const out = await semanticSearch({
-      query: "auth",
-      repo: "octocat/Hello-World",
-      topK: 1,
-    });
-
-    expect(out).toContain("[truncated — use get_file");
-    expect(out.length).toBeLessThan(2000);
   });
 });

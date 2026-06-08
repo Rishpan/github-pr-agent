@@ -34,13 +34,24 @@ rag/                      clone → chunk → embed → Chroma
 3. `index_repo` — clone, chunk, embed, upsert into Chroma
 4. `semantic_search` — find relevant code from the issue title/description
 5. `get_file` / `list_files` — read or explore files as needed
-6. `create_draft_pr` — branch on the fork, commit fix, open draft PR
+6. `create_draft_pr` — branch on the fork, apply patches to one or more files, open draft PR
 
 The agent runs this flow autonomously. You can also call the MCP tools manually from Cursor or another MCP client.
 
 ### Demo bot account
 
 Forks and draft PRs are created under the dedicated demo GitHub account **[pr-agent-demo](https://github.com/pr-agent-demo)** (e.g. `pr-agent-demo/express` when fixing `expressjs/express`). This keeps upstream repos untouched. For your own runs, set `GITHUB_BOT_TOKEN` to a PAT for a bot account you control — do not commit tokens.
+
+### Demo example
+
+A live run on [expressjs/express#7304](https://github.com/expressjs/express/issues/7304) opened **[pr-agent-demo/express#3](https://github.com/pr-agent-demo/express/pull/3)** — a draft PR on the bot fork that bumps `qs` to `6.15.2` (CVE GHSA-q8mj-m7cp-5q26). The PR title/body explain the fix without linking back to the upstream issue.
+
+```bash
+cd agent
+npm start -- https://github.com/expressjs/express/issues/7304
+```
+
+Use `--dry-run` first to print the proposed `fileChanges[]` without opening a PR.
 
 ## MCP tools
 
@@ -51,7 +62,7 @@ Forks and draft PRs are created under the dedicated demo GitHub account **[pr-ag
 | `get_file` | Raw file content from a public repo; optional `startLine`/`endLine` for ranged reads |
 | `list_files` | List a directory (`directory` defaults to repo root) |
 | `fork_repo` | Fork upstream into the bot account (idempotent) |
-| `create_draft_pr` | Branch on the fork, commit a file, open a draft PR |
+| `create_draft_pr` | One branch + draft PR on the fork; `fileChanges[]` with per-file `edits[]` search/replace patches |
 | `index_repo` | Clone, chunk, embed, upsert into Chroma; skips if already indexed unless `force=true` |
 | `semantic_search` | Query indexed code — returns file locations and symbols, not code bodies |
 
@@ -182,7 +193,7 @@ npm install
 cp .env.example .env   # add GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY
 ```
 
-**Run on a specific issue:**
+**Run on a specific issue** (see [Demo example](#demo-example) — [pr-agent-demo/express#3](https://github.com/pr-agent-demo/express/pull/3)):
 
 ```bash
 npm start -- https://github.com/expressjs/express/issues/7304

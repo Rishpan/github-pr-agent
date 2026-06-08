@@ -12,6 +12,11 @@
       "types": "./src/pipeline/indexer.ts",
       "import": "./src/pipeline/indexer.ts",
       "default": "./src/pipeline/indexer.ts"
+    },
+    "./config": {
+      "types": "./src/lib/config.ts",
+      "import": "./src/lib/config.ts",
+      "default": "./src/lib/config.ts"
     }
   },
   "scripts": {

@@ -20,6 +20,7 @@ import {
   semanticSearch,
   getCollection,
   rankSearchResults,
+  formatSearchResultsText,
 } from "../pipeline/retriever";
 
 const sampleMetadata = {
@@ -94,6 +95,8 @@ describe("rankSearchResults", () => {
           endLine: 2,
           language: "typescript",
           classNames: [],
+          functionNames: [],
+          jsdocSummary: null,
           fileKind: "test",
           vectorScore: 0.6,
         },
@@ -105,6 +108,8 @@ describe("rankSearchResults", () => {
           endLine: 2,
           language: "typescript",
           classNames: [],
+          functionNames: [],
+          jsdocSummary: null,
           fileKind: "source",
           vectorScore: 0.58,
         },
@@ -128,6 +133,8 @@ describe("rankSearchResults", () => {
           endLine: 1,
           language: "typescript",
           classNames: [],
+          functionNames: [],
+          jsdocSummary: null,
           fileKind: "source",
           vectorScore: 0.46,
         },
@@ -137,6 +144,87 @@ describe("rankSearchResults", () => {
 
     expect(ranked).toHaveLength(1);
     expect(ranked[0].matchStrength).toBe("weak");
+  });
+
+  it("dedupes multiple hits from the same file path", () => {
+    const ranked = rankSearchResults(
+      [
+        {
+          content: "a",
+          path: "src/foo.ts",
+          repo: "o/r",
+          startLine: 1,
+          endLine: 10,
+          language: "typescript",
+          classNames: [],
+          functionNames: ["a"],
+          jsdocSummary: null,
+          fileKind: "source",
+          vectorScore: 0.7,
+        },
+        {
+          content: "b",
+          path: "src/foo.ts",
+          repo: "o/r",
+          startLine: 20,
+          endLine: 30,
+          language: "typescript",
+          classNames: [],
+          functionNames: ["b"],
+          jsdocSummary: null,
+          fileKind: "source",
+          vectorScore: 0.65,
+        },
+        {
+          content: "c",
+          path: "src/bar.ts",
+          repo: "o/r",
+          startLine: 1,
+          endLine: 5,
+          language: "typescript",
+          classNames: [],
+          functionNames: [],
+          jsdocSummary: null,
+          fileKind: "source",
+          vectorScore: 0.68,
+        },
+      ],
+      3
+    );
+
+    expect(ranked).toHaveLength(2);
+    expect(ranked.map((r) => r.path)).toEqual(["src/foo.ts", "src/bar.ts"]);
+    expect(ranked[0].startLine).toBe(1);
+  });
+});
+
+describe("formatSearchResultsText", () => {
+  it("returns metadata-only output in metadata mode", () => {
+    const text = formatSearchResultsText(
+      [
+        {
+          content: "secret code body",
+          path: "lib/app.js",
+          repo: "o/r",
+          startLine: 10,
+          endLine: 20,
+          language: "javascript",
+          classNames: ["App"],
+          functionNames: ["listen"],
+          jsdocSummary: "Start server.",
+          vectorScore: 0.64,
+          similarityScore: 0.64,
+          matchStrength: "moderate",
+        },
+      ],
+      "listen handler"
+    );
+
+    expect(text).toContain("File: lib/app.js");
+    expect(text).toContain("Symbols: App, listen");
+    expect(text).toContain("JSDoc: Start server.");
+    expect(text).toContain("call get_file with startLine/endLine");
+    expect(text).not.toContain("secret code body");
   });
 });
 
@@ -159,9 +247,9 @@ describe("semanticSearch", () => {
       repo: "octocat/Hello-World",
       classNames: ["Foo", "Bar"],
       vectorScore: 0.9,
-      similarityScore: 0.94,
       matchStrength: "strong",
     });
+    expect(results[0].similarityScore).toBeCloseTo(0.94, 5);
   });
 
   it("returns empty results when every hit is below the absolute floor", async () => {

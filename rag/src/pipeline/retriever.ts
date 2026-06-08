@@ -24,6 +24,8 @@ export interface ChunkSearchResult {
   endLine: number;
   language: string;
   classNames: string[];
+  functionNames: string[];
+  jsdocSummary: string | null;
   /** Raw cosine similarity from Chroma (1 - distance). */
   vectorScore: number;
   /** Score after optional path rerank; used for sorting and display. */
@@ -53,8 +55,14 @@ interface RawSearchHit {
   endLine: number;
   language: string;
   classNames: string[];
+  functionNames: string[];
+  jsdocSummary: string | null;
   fileKind: string | null;
   vectorScore: number;
+}
+
+function parseCommaSeparatedNames(raw: unknown): string[] {
+  return typeof raw === "string" && raw.length > 0 ? raw.split(",") : [];
 }
 
 function buildSearchResult(
@@ -67,11 +75,9 @@ function buildSearchResult(
     return null;
   }
 
-  const classNamesRaw = metadata.classNames;
-  const classNames =
-    typeof classNamesRaw === "string" && classNamesRaw.length > 0
-      ? classNamesRaw.split(",")
-      : [];
+  const classNames = parseCommaSeparatedNames(metadata.classNames);
+  const functionNames = parseCommaSeparatedNames(metadata.functionNames);
+  const jsdocRaw = metadata.jsdocSummary;
 
   const vectorScore = 1 - distance;
   const fileKindRaw = metadata.fileKind;
@@ -84,6 +90,9 @@ function buildSearchResult(
     endLine: Number(metadata.endLine ?? 0),
     language: String(metadata.language ?? ""),
     classNames,
+    functionNames,
+    jsdocSummary:
+      typeof jsdocRaw === "string" && jsdocRaw.length > 0 ? jsdocRaw : null,
     fileKind:
       typeof fileKindRaw === "string" && fileKindRaw.length > 0
         ? fileKindRaw
@@ -112,7 +121,19 @@ function isTestHit(hit: RawSearchHit): boolean {
   return classifyFileKind(hit.path) === "test";
 }
 
-/** Apply absolute floor, relative cutoff, path rerank, sort, and trim to topK. */
+/** Keep the highest-scoring hit per file path so topK means distinct files. */
+function dedupeByPath(ranked: ChunkSearchResult[]): ChunkSearchResult[] {
+  const seen = new Set<string>();
+  const deduped: ChunkSearchResult[] = [];
+  for (const hit of ranked) {
+    if (seen.has(hit.path)) continue;
+    seen.add(hit.path);
+    deduped.push(hit);
+  }
+  return deduped;
+}
+
+/** Apply absolute floor, relative cutoff, path rerank, dedupe by path, sort, and trim to topK. */
 export function rankSearchResults(
   raw: RawSearchHit[],
   topK: number,
@@ -145,10 +166,9 @@ export function rankSearchResults(
         matchStrength: matchStrengthFromScore(r.vectorScore),
       };
     })
-    .sort((a, b) => b.similarityScore - a.similarityScore)
-    .slice(0, topK);
+    .sort((a, b) => b.similarityScore - a.similarityScore);
 
-  return ranked;
+  return dedupeByPath(ranked).slice(0, topK);
 }
 
 function mergeWhere(
@@ -223,19 +243,30 @@ export function formatSearchResultsText(
     return `No relevant chunks found for query: ${query}`;
   }
 
+  const mode = retrieverConfig.searchResultMode;
+
   return results
-    .map(
-      (r, i) => `
-    Result ${i + 1} (similarity: ${r.similarityScore.toFixed(2)}, match: ${r.matchStrength})
-    File: ${r.path}
-    Lines: ${r.startLine}-${r.endLine}
-    Language: ${r.language}
-    Classes: ${r.classNames.length > 0 ? r.classNames.join(", ") : "none"}
+    .map((r, i) => {
+      const symbols = [...r.classNames, ...r.functionNames];
+      const header = `Result ${i + 1} (similarity: ${r.similarityScore.toFixed(2)}, match: ${r.matchStrength})
+File: ${r.path}
+Lines: ${r.startLine}-${r.endLine}
+Language: ${r.language}
+Symbols: ${symbols.length > 0 ? symbols.join(", ") : "none"}`;
 
-    ${truncateChunkContent(r.content)}
+      if (mode === "metadata") {
+        const jsdocLine = r.jsdocSummary ? `\nJSDoc: ${r.jsdocSummary}` : "";
+        return `${header}${jsdocLine}
+Action: call get_file with startLine/endLine (add ±15 line context) to read this region.
+---`;
+      }
 
-    ---`
-    )
+      return `${header}
+
+${truncateChunkContent(r.content)}
+
+---`;
+    })
     .join("\n");
 }
 

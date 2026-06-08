@@ -15,7 +15,7 @@ export const SemanticSearchSchema = z.object({
     .positive()
     .default(5)
     .describe(
-      "Maximum number of chunks to return (3–5 is enough for agents; results are truncated previews)"
+      "Maximum number of distinct files to return (3 is enough for agents; results are metadata-only locations)"
     ),
   excludeTests: z
     .boolean()

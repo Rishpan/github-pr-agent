@@ -20,19 +20,26 @@ const server = new McpServer({
 });
 
 server.registerTool("get_file", {
-  description: "Fetch raw file content from a public GitHub repository",
+  description:
+    "Fetch file content from a public GitHub repository. Omit line range for full file; use startLine/endLine for a slice during investigation.",
   inputSchema: GetFileSchema.shape,
-}, async ({ repo, path }) => {
+}, async ({ repo, path, startLine, endLine, contextLines }) => {
   const start = Date.now();
-  logger.info({ tool: "get_file", input: { repo, path } }, "tool_call_start");
+  logger.info(
+    { tool: "get_file", input: { repo, path, startLine, endLine, contextLines } },
+    "tool_call_start"
+  );
   try {
-    const content = await getFile({ repo, path });
+    const content = await getFile({ repo, path, startLine, endLine, contextLines });
     logger.info({ tool: "get_file", durationMs: Date.now() - start }, "tool_call_success");
     return {
       content: [{ type: "text", text: content }],
     };
   } catch (err) {
-    logger.error({ tool: "get_file", input: { repo, path }, err }, "tool_call_error");
+    logger.error(
+      { tool: "get_file", input: { repo, path, startLine, endLine, contextLines }, err },
+      "tool_call_error"
+    );
     throw err;
   }
 });
@@ -57,19 +64,19 @@ server.registerTool("list_files", {
 
 server.registerTool("index_repo", {
   description:
-    "Clone a GitHub repo, chunk and embed its code with Ollama, and upsert vectors into Chroma for semantic_search",
+    "Clone a GitHub repo, chunk and embed its code with Ollama, and upsert vectors into Chroma for semantic_search. Skips if already indexed unless force=true.",
   inputSchema: IndexRepoSchema.shape,
-}, async ({ repo }) => {
+}, async ({ repo, force }) => {
   const start = Date.now();
-  logger.info({ tool: "index_repo", input: { repo } }, "tool_call_start");
+  logger.info({ tool: "index_repo", input: { repo, force } }, "tool_call_start");
   try {
-    const result = await indexRepo({ repo });
+    const result = await indexRepo({ repo, force });
     logger.info({ tool: "index_repo", durationMs: Date.now() - start }, "tool_call_success");
     return {
       content: [{ type: "text", text: result }],
     };
   } catch (err) {
-    logger.error({ tool: "index_repo", input: { repo }, err }, "tool_call_error");
+    logger.error({ tool: "index_repo", input: { repo, force }, err }, "tool_call_error");
     throw err;
   }
 });
@@ -95,14 +102,20 @@ server.registerTool("fork_repo", {
 
 server.registerTool("create_draft_pr", {
   description:
-    "Create a branch on the bot fork, commit a file fix, and open a draft pull request within the fork",
+    "Create a branch on the bot fork, apply search/replace edits, and open one draft PR. Pass fileChanges[] — each entry has filePath + edits[]. Multiple files land in the same PR.",
   inputSchema: CreateDraftPRSchema.shape,
-}, async ({ repo, forkRepo, branch, filePath, newContent, title, description }) => {
+}, async ({ repo, forkRepo, branch, fileChanges, title, description }) => {
   const start = Date.now();
   logger.info(
     {
       tool: "create_draft_pr",
-      input: { repo, forkRepo, branch, filePath, title },
+      input: {
+        repo,
+        forkRepo,
+        branch,
+        filePaths: fileChanges.map((c) => c.filePath),
+        title,
+      },
     },
     "tool_call_start"
   );
@@ -111,8 +124,7 @@ server.registerTool("create_draft_pr", {
       repo,
       forkRepo,
       branch,
-      filePath,
-      newContent,
+      fileChanges,
       title,
       description,
     });
@@ -127,7 +139,7 @@ server.registerTool("create_draft_pr", {
     logger.error(
       {
         tool: "create_draft_pr",
-        input: { repo, forkRepo, branch, filePath, title },
+        input: { repo, forkRepo, branch, filePaths: fileChanges.map((c) => c.filePath), title },
         err,
       },
       "tool_call_error"

@@ -5,6 +5,7 @@ const mockCloneRepo = vi.fn();
 const mockChunkRepo = vi.fn();
 const mockEmbedChunks = vi.fn();
 const mockUpsert = vi.fn();
+const mockGetCollection = vi.fn();
 const mockGetOrCreateCollection = vi.fn();
 
 vi.mock("../pipeline/cloner", () => ({
@@ -33,6 +34,7 @@ vi.mock("../pipeline/embedder", () => ({
 
 vi.mock("../db/chroma", () => ({
   createChromaClient: () => ({
+    getCollection: mockGetCollection,
     getOrCreateCollection: mockGetOrCreateCollection,
   }),
 }));
@@ -73,8 +75,10 @@ beforeEach(() => {
   mockChunkRepo.mockReset();
   mockEmbedChunks.mockReset();
   mockUpsert.mockReset();
+  mockGetCollection.mockReset();
   mockGetOrCreateCollection.mockReset();
 
+  mockGetCollection.mockRejectedValue(new Error("not found"));
   mockGetOrCreateCollection.mockResolvedValue({ upsert: mockUpsert });
 });
 
@@ -121,6 +125,8 @@ describe("indexRepo", () => {
           startLine: 1,
           endLine: 1,
           classNames: "",
+          functionNames: "foo",
+          fileKind: "source",
         },
       ],
     });
@@ -142,6 +148,41 @@ describe("indexRepo", () => {
     expect(mockEmbedChunks).not.toHaveBeenCalled();
     expect(mockGetOrCreateCollection).not.toHaveBeenCalled();
     expect(result.chunkCount).toBe(0);
+  });
+
+  it("skips clone and embed when the collection already has chunks", async () => {
+    mockGetCollection.mockResolvedValue({
+      count: vi.fn().mockResolvedValue(99),
+    });
+
+    const result = await indexRepo("octocat/Hello-World");
+
+    expect(mockCloneRepo).not.toHaveBeenCalled();
+    expect(mockChunkRepo).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      repo: "octocat/Hello-World",
+      chunkCount: 99,
+      collectionName: "code-octocat--Hello-World",
+      skipped: true,
+    });
+  });
+
+  it("re-indexes when force is true even if chunks exist", async () => {
+    const localPath = "/tmp/github-pr-agent/octocat/Hello-World";
+    mockGetCollection.mockResolvedValue({
+      count: vi.fn().mockResolvedValue(99),
+    });
+    mockCloneRepo.mockResolvedValue(localPath);
+    mockChunkRepo.mockResolvedValue([sampleChunk]);
+    mockEmbedChunks.mockResolvedValue([
+      { ...sampleChunk, embedding: [0.1, 0.2] },
+    ]);
+
+    const result = await indexRepo("octocat/Hello-World", { force: true });
+
+    expect(mockCloneRepo).toHaveBeenCalled();
+    expect(result.skipped).toBeUndefined();
+    expect(result.chunkCount).toBe(1);
   });
 
   it("wraps unexpected errors in IndexerError", async () => {
